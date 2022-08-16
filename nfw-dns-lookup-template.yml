@@ -1,0 +1,298 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+    A Lambda function and associated resources to support DNS resolution in AWS Network Firewall rules.
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Label: 
+          default: "Lambda configuration"
+        Parameters:
+          - LambdaFunctionName
+          - LambdaRoleName
+          - LambdaPolicyName
+          - LambdaJobFrequency
+      -
+        Label:
+          default: "Firewall rule configuration"
+        Parameters:
+          - StatefulRuleGroupName
+          - Domain
+          - SourceNet
+          - SourcePort
+          - DestPort
+          - TrafficAction
+          - TrafficType
+
+Parameters:
+  LambdaFunctionName:
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9_-]*'
+    Description: The name of the Lambda function to be deployed
+    Default: Network-Firewall-Resolver-Function
+  LambdaRoleName:
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: '[\w+=,.@-]+'
+    Description: The name of the IAM role used as the Lambda execution role
+    Default: Network-Firewall-Resolver-Lambda-Role
+  LambdaPolicyName:
+    Type: String
+    MinLength: '1'
+    MaxLength: '128'
+    AllowedPattern: '[\w+=,.@-]+'
+    Default: Network-Firewall-Resolver-Lambda-Policy
+  LambdaJobFrequency:
+    Type: String
+    MinLength: '1'
+    MaxLength: '2'
+    AllowedPattern: '^([1-9]|[1-5][0-9])$'
+    Description: The scheduled frequency in minutes to trigger the Lambda function
+    Default: 10  
+  StatefulRuleGroupName:
+    Type: String
+    MinLength: '1'
+    MaxLength: '128'
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+    Description: The name of the stateful rule group to create and modify
+    Default: Lambda-Managed-Stateful-Rule
+  Domain:
+    Type: String
+    MinLength: '1'
+    MaxLength: '255'
+    Description: The name of the DNS domain to resolve
+    Default: example.org
+  SourcePort:
+    Type: String
+    MinLength: '1'
+    MaxLength: '1024'
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+    Description: Specify the source port to allow or deny traffic from. Example - 22 or Any to allow all ports
+    Default: Any
+  SourceNet:
+    Type: String
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+    Description: Specify the source traffic CIDR range. Example - 10.0.0.0/8 or 192.168.0.5/32 or Any to allow all IPs. 
+    Default: Any
+  DestPort:
+    Type: String
+    MinLength: '1'
+    MaxLength: '1024'
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+    Description: Specify the destination port to allow or deny traffic to. Example - 22
+    Default: 22
+  TrafficAction:
+    Type: String
+    AllowedValues:
+      - PASS
+      - DROP
+      - ALERT
+    ConstraintDescription: Must be a valid Network Firewall rule action
+    Default: PASS
+  TrafficType:
+    Type: String
+    AllowedValues:
+      - DCERPC
+      - DHCP
+      - DNS
+      - FTP
+      - HTTP
+      - ICMP
+      - IKEV2
+      - IMAP
+      - IP
+      - KRB5
+      - MSN
+      - NTP
+      - SMB
+      - SMTP
+      - SSH 
+      - TCP
+      - TFTP
+      - TLS
+      - UDP
+    ConstraintDescription: Must be a valid protocol
+    Default: SSH 
+Resources:
+  StatefulRuleGroup:
+    Type: AWS::NetworkFirewall::RuleGroup
+    Properties:
+      RuleGroupName: !Ref StatefulRuleGroupName
+      Type: STATEFUL
+      RuleGroup:
+        RuleVariables:
+          IPSets:
+            IP_NET:
+              Definition:
+                - 192.0.2.0/32
+        RulesSource:
+          StatefulRules:
+            - Action: !Ref TrafficAction
+              Header:
+                Destination: "$IP_NET"
+                DestinationPort: !Ref DestPort
+                Direction: FORWARD
+                Protocol: !Ref TrafficType
+                Source: !Ref SourceNet
+                SourcePort: !Ref SourcePort
+              RuleOptions:
+                - Keyword: sid
+                  Settings: 
+                    - 1
+      Capacity: 10
+      Description: Destination network managed by Lambda function
+      Tags:
+        - Key: ManagedByLambdaFunction
+          Value: True
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref LambdaRoleName
+      Description: An execution role for a Lambda function launched by CloudFormation
+      ManagedPolicyArns:
+        - !Ref LambdaPolicy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+          - 'sts:AssumeRole'
+      
+  LambdaPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Ref LambdaPolicyName
+      Description: Policy for a Lambda function to modify a specific Network Firewall stateful rule group
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'network-firewall:DescribeRuleGroup'
+              - 'network-firewall:UpdateRuleGroup'
+            Resource: !Sub 'arn:${AWS::Partition}:network-firewall:${AWS::Region}:${AWS::AccountId}:stateful-rulegroup/${StatefulRuleGroupName}'
+          - Effect: Allow
+            Action:
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+            Resource: !Join ['',['arn:', !Ref AWS::Partition, ':logs:', !Ref AWS::Region, ':', !Ref AWS::AccountId, ':log-group:/aws/lambda/', !Ref LambdaFunctionName, ':*']]
+          - Effect: Allow
+            Action:
+              - 'logs:CreateLogGroup'
+            Resource: !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:*'
+        
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ['',['/aws/lambda/', !Ref LambdaFunctionName]]
+      RetentionInDays: 30
+
+  EventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Scheduled rule to invoke the DNS resolver Lambda function
+      ScheduleExpression: !Join ['',['rate(',!Ref LambdaJobFrequency,' minutes)']]
+      State: ENABLED
+      Targets:
+        -
+          Arn: !GetAtt LambdaFunction.Arn
+          Id: !Ref LambdaFunctionName
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunctionName
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeRule.Arn
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Modifies a specific Network Firewall stateful rule group with the results of a given DNS query
+      FunctionName: !Ref LambdaFunctionName
+      Handler: index.lambda_handler
+      MemorySize: 256
+      Runtime: python3.9
+      Role: !GetAtt 'LambdaRole.Arn'
+      Timeout: 15
+      Environment:
+        Variables:
+          StatefulRuleGroupName: !Ref StatefulRuleGroupName
+          Domain: !Ref Domain
+      Code:
+        ZipFile: |       
+            import socket
+            import boto3
+            import json
+            import os
+            import logging
+
+            # Set up the logger
+            logger = logging.getLogger()
+            logger.setLevel(logging.INFO)
+
+            # Set up env variables
+            Domain = os.environ.get('Domain')
+            StatefulRuleGroupName = os.environ.get('StatefulRuleGroupName')
+
+            # set up boto3 client
+            client = boto3.client('network-firewall')
+
+            def lambda_handler(event, context):   
+                try:
+                    ip_list = socket.gethostbyname_ex(Domain)
+                except Exception as e:
+                    logging.error("Exception occurred while converting domain to IPs", exc_info=True)
+                else:    
+                    logger.info('Domain maps to following IPs: %s',ip_list)
+
+                    try:
+                        response = client.describe_rule_group(
+                            RuleGroupName= StatefulRuleGroupName,    
+                            Type='STATEFUL'
+                        )
+                    except Exception as e:    
+                        logging.error("Exception occurred while describing rulegroup", exc_info=True)
+                    else:
+                        logger.info('StatefulRuleGroup definition response: %s',response)
+
+                        try:                 
+                            updtoken = response['UpdateToken']
+                            rulvar = response['RuleGroup']['RuleVariables']
+                            for entry in rulvar['IPSets']['IP_NET']['Definition']:
+                                rulvar['IPSets']['IP_NET']['Definition'].remove(entry)
+                            for entry in ip_list[2]:
+                                entry = entry + '/32'
+                                rulvar['IPSets']['IP_NET']['Definition'].append(entry)
+                            arn = response['RuleGroupResponse']['RuleGroupArn']
+                            rulstr = dict(response['RuleGroup']['RulesSource'])
+
+                            rulegrp_dict = dict([
+                                ('RuleVariables', rulvar),
+                                ('RulesSource', rulstr),
+                            ])
+
+                            response = client.update_rule_group(
+                                UpdateToken=updtoken,
+                                RuleGroupArn=arn,
+                                RuleGroupName= StatefulRuleGroupName,
+                                RuleGroup=rulegrp_dict,    
+                                Type='STATEFUL',
+                                DryRun=False
+                            )
+
+                        except Exception as e:
+                            logging.error("Exception occurred while updating rulegroup", exc_info=True)
+                        else:        
+                            logger.info('StatefulRuleGroup updated sucessfully, response: %s',response)
+                            return {
+                                'statusCode': 200,
+                                'body': json.dumps('Domain '+ Domain + ' sucessfully resolved and the Network Firewall rule group has been updated.')
+                            }
