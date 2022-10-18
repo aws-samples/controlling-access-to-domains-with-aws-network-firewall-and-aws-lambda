@@ -1,11 +1,14 @@
-## My Project
+## Control non-HTTP and non-HTTPS traffic to a domain with AWS Network Firewall and AWS Lambda
 
-TODO: Fill this README out!
+This repository serves as the code and CloudFormation template storage for the blog post below.
 
-Be sure to:
+- [Blog post title](https://add link)
 
-* Change the title in this README
-* Edit your repository description on GitHub
+If you plan to deploy the code in this repo, please follow along with the blog post for step-by-step instructions and architecure diagrams.
+
+## Contributors
+
+[Bhavin Lakhani](https://www.linkedin.com/in/bhavinl/) and [@tylerapplebaum](https://github.com/tylerapplebaum)
 
 ## Security
 
@@ -14,4 +17,3 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 ## License
 
 This library is licensed under the MIT-0 License. See the LICENSE file.
-
