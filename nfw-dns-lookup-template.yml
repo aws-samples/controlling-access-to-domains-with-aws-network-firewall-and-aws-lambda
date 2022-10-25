@@ -181,7 +181,7 @@ Resources:
             Action:
               - 'logs:CreateLogStream'
               - 'logs:PutLogEvents'
-            Resource: !Join ['',['arn:', !Ref AWS::Partition, ':logs:', !Ref AWS::Region, ':', !Ref AWS::AccountId, ':log-group:/aws/lambda/', !Ref LambdaFunctionName, ':*']]
+            Resource: !Join ['',['arn:', !Ref "AWS::Partition", ':logs:', !Ref "AWS::Region", ':', !Ref "AWS::AccountId", ':log-group:/aws/lambda/', !Ref LambdaFunctionName, ':*']]
           - Effect: Allow
             Action:
               - 'logs:CreateLogGroup'
@@ -197,7 +197,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Description: Scheduled rule to invoke the DNS resolver Lambda function
-      ScheduleExpression: !Join ['',['rate(',!Ref LambdaJobFrequency,' minutes)']]
+      ScheduleExpression: !Join ['',['cron(0/',!Ref LambdaJobFrequency,' * * * ? *)']]
       State: ENABLED
       Targets:
         -

@@ -1,8 +1,8 @@
-## Control non-HTTP and non-HTTPS traffic to a domain with AWS Network Firewall and AWS Lambda
+## How to control non-HTTP and non-HTTPS traffic to a DNS domain with AWS Network Firewall and AWS Lambda
 
 This repository serves as the code and CloudFormation template storage for the blog post below.
 
-- [Blog post title](https://add-a-link)
+- [How to control non-HTTP and non-HTTPS traffic to a DNS domain with AWS Network Firewall and AWS Lambda](https://add-a-link)
 
 If you plan to deploy the code in this repo, please follow along with the blog post for step-by-step instructions and architecure diagrams.
 
