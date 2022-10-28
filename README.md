@@ -8,7 +8,7 @@ If you plan to deploy the code in this repo, please follow along with the blog p
 
 ## Contributors
 
-[Bhavin Lakhani](https://www.linkedin.com/in/bhavinl/) and [@tylerapplebaum](https://github.com/tylerapplebaum)
+[Bhavin Lakhani](https://www.linkedin.com/in/bhavinl/) and [Tyler Applebaum](https://github.com/tylerapplebaum)
 
 ## Security
 
