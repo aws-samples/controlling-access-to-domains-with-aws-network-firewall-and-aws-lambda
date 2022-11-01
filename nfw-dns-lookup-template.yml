@@ -291,7 +291,7 @@ Resources:
                         except Exception as e:
                             logging.error("Exception occurred while updating rulegroup", exc_info=True)
                         else:        
-                            logger.info('StatefulRuleGroup updated sucessfully, response: %s',response)
+                            logger.info('StatefulRuleGroup updated successfully, response: %s',response)
                             return {
                                 'statusCode': 200,
                                 'body': json.dumps('Domain '+ Domain + ' sucessfully resolved and the Network Firewall rule group has been updated.')
