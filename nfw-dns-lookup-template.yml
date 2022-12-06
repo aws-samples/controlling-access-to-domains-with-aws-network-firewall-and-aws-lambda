@@ -266,27 +266,50 @@ Resources:
                         try:                 
                             updtoken = response['UpdateToken']
                             rulvar = response['RuleGroup']['RuleVariables']
-                            for entry in rulvar['IPSets']['IP_NET']['Definition']:
-                                rulvar['IPSets']['IP_NET']['Definition'].remove(entry)
-                            for entry in ip_list[2]:
-                                entry = entry + '/32'
-                                rulvar['IPSets']['IP_NET']['Definition'].append(entry)
-                            arn = response['RuleGroupResponse']['RuleGroupArn']
-                            rulstr = dict(response['RuleGroup']['RulesSource'])
+                            
+                            ##[BL] commented 11/21 to fix duplicate ip issue
+                            #for entry in rulvar['IPSets']['IP_NET']['Definition']:
+                                #rulvar['IPSets']['IP_NET']['Definition'].remove(entry)
+                                
+                            #for entry in ip_list[2]:
+                                #entry = entry + '/32'
+                                #rulvar['IPSets']['IP_NET']['Definition'].append(entry)
+                            ##[BL] eof comment 11/21 to fix duplicate ip issue
+                            
+                            #[BL] Fix for Duplicate/incorrect IP's & skipping the update in case no new ips found.
+                            ip_list = [entry + '/32' for entry in ip_list[2]] 
+                            existing_ips = rulvar['IPSets']['IP_NET']['Definition']
+                            new_ips = list(set(ip_list)-set(existing_ips))
+                            
+                            if new_ips:
+                                logger.info('Found new ips which do not exist in current rulegroup : %s',new_ips)
 
-                            rulegrp_dict = dict([
-                                ('RuleVariables', rulvar),
-                                ('RulesSource', rulstr),
-                            ])
+                                if '192.0.2.0/32' in rulvar['IPSets']['IP_NET']['Definition']:
+                                    rulvar['IPSets']['IP_NET']['Definition'].remove('192.0.2.0/32')
 
-                            response = client.update_rule_group(
-                                UpdateToken=updtoken,
-                                RuleGroupArn=arn,
-                                RuleGroupName= StatefulRuleGroupName,
-                                RuleGroup=rulegrp_dict,    
-                                Type='STATEFUL',
-                                DryRun=False
-                            )
+                                for i in new_ips:
+                                    rulvar['IPSets']['IP_NET']['Definition'].append(i)
+                                
+                                arn = response['RuleGroupResponse']['RuleGroupArn']
+                                rulstr = dict(response['RuleGroup']['RulesSource'])
+                
+                                rulegrp_dict = dict([
+                                    ('RuleVariables', rulvar),
+                                    ('RulesSource', rulstr),
+                                ])
+                
+                                response = client.update_rule_group(
+                                    UpdateToken=updtoken,
+                                    RuleGroupArn=arn,
+                                    RuleGroupName= StatefulRuleGroupName,
+                                    RuleGroup=rulegrp_dict,    
+                                    Type='STATEFUL',
+                                    DryRun=False
+                                )
+                            else: 
+                                logger.info('No new ips found, skipping the update')
+                                
+                            #[BL] eof Fix for Duplicate/incorrect IP's & skipping the update in case no new ips found.    
 
                         except Exception as e:
                             logging.error("Exception occurred while updating rulegroup", exc_info=True)
@@ -294,5 +317,5 @@ Resources:
                             logger.info('StatefulRuleGroup updated successfully, response: %s',response)
                             return {
                                 'statusCode': 200,
-                                'body': json.dumps('Domain '+ Domain + ' sucessfully resolved and the Network Firewall rule group has been updated.')
+                                'body': json.dumps('Domain '+ Domain + ' successfully resolved and the Network Firewall rule group has been updated.')
                             }
